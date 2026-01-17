@@ -1,60 +1,102 @@
 #!/system/bin/sh
-# Asegúrate de que este script se ejecute con Magisk/KernelSU
+# Modulo: Android App Optimizer
+# Dev: LuferOS
+# Script optimizado con failovers, logs y protección de batería.
 
-# Espera un poco más después de que el arranque se complete para que el sistema se estabilice
-# Espera hasta que la propiedad sys.boot_completed sea 1
+# --- Variables y Configuración ---
+MODDIR=${0%/*}
+LOG_FILE="/data/local/tmp/luferos_optimizer.log"
+MARKER_FILE="$MODDIR/.ran_once"
+COMPILER_FILTER="speed-profile"
+BATTERY_THRESHOLD=20
+
+# --- Funciones ---
+
+# Función de Log dual (Logcat + Archivo)
+print_log() {
+  local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+  echo "$timestamp - $1" >> "$LOG_FILE"
+  log -p i -t LuferOS_Optimizer "$1"
+}
+
+# --- Inicio del Script ---
+
+# 1. Espera a que el sistema arranque
 while [ "$(getprop sys.boot_completed)" != "1" ]; do
   sleep 1
 done
 
-# Espera adicional para asegurar que todo esté listo (puedes ajustar este valor si es necesario)
+# 2. Espera de estabilización (60s)
 sleep 60
 
-# --- Configuración ---
-# Define el filtro de compilación a usar. Opciones comunes:
-# speed-profile: Compila basado en perfiles de uso (recomendado, equilibrio).
-# speed: Optimiza para velocidad de ejecución (puede usar más espacio).
-# everything: Compila todo por adelantado (usa mucho más espacio, puede ralentizar la instalación/actualización).
-# verify: Solo verifica el código (sin compilación AOT significativa).
-# quicken: Un filtro de optimización menos agresivo que 'speed'.
-# space-profile: Optimiza para tamaño basado en perfiles.
-# space: Optimiza para tamaño.
-COMPILER_FILTER="speed-profile" # Puedes cambiar esto según tus preferencias
-
-# --- Lógica Principal ---
-
-echo "Dex2OAT Boost: Iniciando recompilación de paquetes de terceros con el filtro '$COMPILER_FILTER'."
-log -p i -t Dex2OAT_Boost "Iniciando recompilación con filtro: $COMPILER_FILTER en cada arranque."
-
-# Obtiene la lista de paquetes de terceros instalados
-# Usamos 'pm list packages -3 -f' para obtener la ruta completa, aunque solo necesitamos el nombre del paquete.
-# El 'cut -d':' -f2 | sed 's/package=//'' extrae solo el nombre del paquete.
-packages=$(pm list packages -3 -f | cut -d':' -f2 | sed 's/package=//')
-
-# Verifica si se obtuvieron paquetes
-if [ -z "$packages" ]; then
-  echo "Dex2OAT Boost: No se encontraron paquetes de terceros para recompilar."
-  log -p w -t Dex2OAT_Boost "No se encontraron paquetes de terceros."
+# 3. Verificación de Ejecución Única (Run-Once)
+# Si el archivo marcador existe, el script asume que ya hizo su trabajo y se detiene.
+if [ -f "$MARKER_FILE" ]; then
+  log -p i -t LuferOS_Optimizer "El script ya se ejecutó anteriormente. Saliendo."
   exit 0
 fi
 
-# Itera sobre cada paquete y fuerza la recompilación
-for pkg in $packages; do
-  # Verifica si el paquete todavía existe antes de intentar compilarlo
-  if pm list packages | grep -q "^package:$pkg$"; then
-    echo "Dex2OAT Boost: Recompilando $pkg..."
-    log -p i -t Dex2OAT_Boost "Recompilando $pkg..."
-    # Ejecuta el comando de compilación
-    cmd package compile -m $COMPILER_FILTER -f "$pkg"
-    # Pequeña pausa para no sobrecargar el sistema (ajustable)
+# 4. Verificación de Batería (Failover de seguridad)
+# Lee la capacidad actual de la batería. Si falla la lectura, asume 100 para no bloquear.
+BATTERY_LEVEL=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null || echo 100)
+
+if [ "$BATTERY_LEVEL" -lt "$BATTERY_THRESHOLD" ]; then
+  print_log "ABORTADO: Batería baja ($BATTERY_LEVEL%). Se requiere mínimo $BATTERY_THRESHOLD%."
+  exit 1
+fi
+
+# --- Lógica Principal ---
+
+print_log "Iniciando proceso de optimización. Filtro: $COMPILER_FILTER"
+print_log "Batería actual: $BATTERY_LEVEL%"
+
+# Limpia el log anterior si es muy grande (opcional)
+if [ -f "$LOG_FILE" ] && [ $(stat -c%s "$LOG_FILE") -gt 102400 ]; then
+  rm "$LOG_FILE"
+fi
+
+# Obtiene la lista limpia de paquetes de terceros
+# Usamos 'awk' o 'sed' para limpiar la salida de 'pm list' de forma más segura
+PACKAGES=$(pm list packages -3 | sed 's/^package://')
+
+if [ -z "$PACKAGES" ]; then
+  print_log "Error: No se detectaron aplicaciones de terceros."
+  exit 1
+fi
+
+COUNT=0
+TOTAL=$(echo "$PACKAGES" | wc -l)
+
+print_log "Se encontraron $TOTAL aplicaciones para optimizar."
+
+for pkg in $PACKAGES; do
+  # Verifica si el paquete aún existe
+  if pm path "$pkg" > /dev/null 2>&1; then
+    
+    # Ejecuta la compilación con 'nice -n 19'
+    # Esto le da la prioridad MÁS BAJA al proceso, evitando que el teléfono se congele (lag)
+    nice -n 19 cmd package compile -m "$COMPILER_FILTER" -f "$pkg" > /dev/null 2>&1
+    
+    # Verificamos el código de salida del comando anterior
+    if [ $? -eq 0 ]; then
+      print_log "[$((++COUNT))/$TOTAL] OK: $pkg"
+    else
+      print_log "[$((++COUNT))/$TOTAL] FAIL: $pkg (Error en cmd compile)"
+    fi
+    
+    # Pequeña pausa para enfriar CPU
     sleep 0.5
   else
-    echo "Dex2OAT Boost: El paquete $pkg ya no existe, omitiendo."
-    log -p w -t Dex2OAT_Boost "El paquete $pkg ya no existe, omitiendo."
+    print_log "SKIP: $pkg ya no existe."
   fi
 done
 
-echo "Dex2OAT Boost: Recompilación completada para este arranque."
-log -p i -t Dex2OAT_Boost "Recompilación completada."
+# --- Finalización ---
+
+print_log "Optimización completada exitosamente."
+
+# Crear el archivo marcador para que NO se ejecute en el próximo reinicio
+touch "$MARKER_FILE"
+print_log "Marcador creado. No se ejecutará de nuevo hasta reinstalar el módulo."
 
 exit 0
