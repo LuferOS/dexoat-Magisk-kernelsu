@@ -1,27 +1,80 @@
-#¿Cómo funciona?
+# 🚀 Android App Optimizer (Speed Profile)
+> *Módulo para Magisk & KernelSU*
 
-Tipo de Módulo: Es un módulo para Magisk o KernelSU, herramientas que permiten modificar el sistema Android sin alterar la partición /system directamente.
-Acción Principal: El módulo ejecuta un script (service.sh) una única vez, justo después del primer reinicio completo del dispositivo tras la instalación del módulo.
-Recompilación Forzada: Este script le ordena al sistema Android (usando el comando cmd package compile) que recompile todas las aplicaciones que tú (el usuario) has instalado (las llamadas "aplicaciones de terceros").
-Filtro de Optimización: Por defecto, utiliza el filtro de compilación "speed-profile". Este filtro busca un equilibrio: intenta optimizar las partes más usadas de las aplicaciones para que se ejecuten más rápido, basándose en perfiles de uso que el sistema genera, sin aumentar excesivamente el espacio de almacenamiento que ocupan las apps.
-Ejecución Única: Para evitar ralentizar el dispositivo en cada arranque, el script crea un archivo marcador (.ran_once) después de ejecutarse. En los siguientes reinicios, el script verá que el marcador existe y no hará nada más.
-¿Cómo se instala?
+![Magisk](https://img.shields.io/badge/Magisk-Module-green?style=for-the-badge&logo=android)
+![KernelSU](https://img.shields.io/badge/KernelSU-Supported-blue?style=for-the-badge&logo=linux)
+![Author](https://img.shields.io/badge/Dev-LuferOS-orange?style=for-the-badge&logo=github)
 
-#Flasheo: 
-Abre la aplicación Magisk Manager o KernelSU Manager en tu dispositivo, ve a la sección de Módulos, selecciona "Instalar desde almacenamiento" y elige el archivo ZIP que creaste.
-Reinicio: Una vez instalado, reinicia tu dispositivo. El módulo hará su trabajo automáticamente en segundo plano después de que el sistema haya arrancado completamente (tras una espera adicional de 60 segundos para asegurar estabilidad).
-Versiones Requeridas:
+¡Bienvenido! Este módulo está diseñado para darle un "empujón" de rendimiento a tus aplicaciones instaladas forzando una recompilación inteligente del sistema tras la instalación.
 
-Magisk/KernelSU: Necesitas tener Magisk o KernelSU instalado y funcionando correctamente. Versiones recientes son recomendables.
-Android: El comando cmd package compile y los filtros de compilación son parte de Android desde hace varias versiones (generalmente desde Android 7 Nougat en adelante). Sin embargo, su comportamiento y efectividad pueden variar. Es más probable que funcione como se espera en versiones de Android 9 (Pie) o superiores. La compatibilidad exacta puede depender del fabricante y la versión específica de Android.
+---
 
-#¿Cuándo NO instalarlo?
+## 🧐 ¿Cómo funciona?
 
-Si no tienes Root (Magisk/KernelSU): El módulo necesita estos permisos para funcionar.
-Si no estás seguro o te preocupan los riesgos: Existe una pequeña posibilidad de causar inestabilidad, reinicios inesperados (bootloops) o un mayor consumo de batería. Si no estás cómodo con esto, es mejor no instalarlo. Siempre haz una copia de seguridad antes.
-Si tu dispositivo ya es inestable: No añadas modificaciones que podrían empeorar la situación.
-Si tienes muy poco espacio de almacenamiento: Aunque "speed-profile" es moderado, si modificaras el script para usar filtros más agresivos como "speed" o "everything", el espacio ocupado por las aplicaciones compiladas podría aumentar notablemente.
-Si prefieres dejar que Android gestione la optimización: El sistema operativo ya tiene sus propios métodos para optimizar apps (a menudo llamados dexopt en segundo plano) que suelen estar bien ajustados. Forzar un método podría no ser beneficioso.
-En ROMs personalizadas muy modificadas: Algunas ROMs ya incluyen sus propias optimizaciones o cambios en cómo funciona la compilación. Este módulo podría entrar en conflicto con ellas.
+Este módulo actúa como un disparador de optimización post-arranque. Aquí está la magia bajo el capó:
 
-SIENTETE LIBRE DE COLABORAR EN ESTE MODULO
+1.  **⚡ Acción Principal:** Ejecuta un script (`service.sh`) **una única vez** tras el primer reinicio después de instalar el módulo.
+2.  **🛠 Recompilación Forzada:** Ordena al sistema Android (vía `cmd package compile`) que recompile todas las aplicaciones de usuario (Terceros).
+3.  **🧠 Filtro Inteligente (`speed-profile`):**
+    * No compila todo "a lo bruto". Utiliza el perfil `speed-profile`.
+    * **El equilibrio perfecto:** Optimiza las partes más usadas del código basándose en cómo usas tu móvil, mejorando la velocidad sin devorar tu almacenamiento.
+4.  **🛑 Ejecución Única (Zero Lag):** Para no ralentizar tus siguientes arranques, el script crea un archivo testigo (`.ran_once`). Si el sistema ve este archivo, el script **no hace nada**, asegurando que tu inicio sea rápido siempre.
+
+---
+
+## 📲 Instalación
+
+¡Es súper sencillo! Sigue estos pasos:
+
+1.  **Descarga** el archivo `.zip` del módulo.
+2.  Abre tu gestor favorito: **Magisk Manager** o **KernelSU**.
+3.  Ve a la pestaña de **Módulos**.
+4.  Toca en **"Instalar desde almacenamiento"** y selecciona el archivo.
+5.  **Reinicia tu dispositivo**.
+    * *Nota:* Tras arrancar, espera unos **60 segundos** adicionales. El módulo trabaja en segundo plano para asegurar estabilidad antes de empezar a compilar.
+
+---
+
+## 📋 Requisitos y Compatibilidad
+
+| Requisito | Detalle |
+| :--- | :--- |
+| **Root Manager** | Magisk o KernelSU (versiones recientes recomendadas). |
+| **Android** | Android 7 (Nougat) en adelante. |
+| **Recomendado** | Funciona mejor y más consistentemente en **Android 9 (Pie) o superior**. |
+
+---
+
+## ⚠️ ¿Cuándo NO instalar este módulo?
+
+Sé responsable con tu dispositivo. **Evita instalarlo si:**
+
+* ❌ **No tienes Root:** Obvio, pero necesario recordar. Requiere acceso privilegiado.
+* ❌ **Tienes poco espacio:** Aunque `speed-profile` es eficiente, compilar apps ocupa algo más de espacio que el código interpretado. Si estás al límite de almacenamiento, ten cuidado.
+* ❌ **Tu móvil ya es inestable:** Si sufres de *bootloops* o reinicios aleatorios, no añadas más carga al sistema.
+* ❌ **ROMs muy modificadas:** Algunas Custom ROMs ya traen sus propios scripts de `dexopt`. Esto podría causar conflictos.
+* ❌ **Miedo al riesgo:** Siempre existe una mínima posibilidad de *bootloop* o consumo alto de batería temporal mientras se compila. **¡Haz siempre un Backup antes!**
+
+> **Nota:** Android tiene su propio sistema de optimización en segundo plano (cuando el móvil carga de noche). Este módulo solo *fuerza* ese proceso inmediatamente para usuarios que quieren rendimiento *ya*.
+
+---
+
+## 🤝 Colaboración
+
+¡Este proyecto es de código abierto y la comunidad es bienvenida!
+Si tienes ideas para mejorar el script, nuevos filtros de compilación o correcciones:
+
+1.  Haz un **Fork** del repositorio.
+2.  Crea tu rama de características (`git checkout -b feature/AmazingFeature`).
+3.  Haz tus cambios y **Commit** (`git commit -m 'Add some AmazingFeature'`).
+4.  Sube tus cambios (`git push origin feature/AmazingFeature`).
+5.  Abre un **Pull Request**.
+
+---
+
+<div align="center">
+
+### Desarrollado con ❤️ por [LuferOS](https://github.com/LuferOS)
+*Si te sirvió, ¡no olvides dejar una estrella ⭐ en el repo!*
+
+</div>
